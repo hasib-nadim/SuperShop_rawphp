@@ -1,16 +1,14 @@
 <?php
-session_start();
-require_once __DIR__ . '/_config/env.php'; 
+session_start();  
+require_once __DIR__ . '/app/config/env.php'; 
 
 function pageHead($pageTitle="Bigshop", $stylesheets=[]) {
-    $pageTitle = $pageTitle;
-    $stylesheets = $stylesheets; 
-    require_once __DIR__ . '/_views/head.php';
-    require_once __DIR__ . '/_views/header.php';
+    require_once __DIR__ . '/partials/head.php';
+    require_once __DIR__ . '/partials/header.php';
 }
 
 function pageFooter() {
-    require_once __DIR__ . '/_views/footer.php';
+    require_once __DIR__ . '/partials/footer.php';
 }
 
 function redirect($url) {

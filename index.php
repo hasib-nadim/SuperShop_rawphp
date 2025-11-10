@@ -8,6 +8,7 @@ pageHead("Home - Supershop", ["home.css"]);
     <div class="container">
         <div>📞 Customer Service: +1-800-123-4567</div>
         <div>
+            <!-- <?php echo env('APP_ENV'); ?> -->
             <a href="#">Track Order</a>
             <a href="#">Help</a>
         </div>
@@ -25,7 +26,7 @@ pageHead("Home - Supershop", ["home.css"]);
         <div class="header-icons">
             <a class="icon-btn" href="/auth/login/">
                 👤
-</a>
+            </a>
             <button class="icon-btn">
                 ❤️
                 <span class="badge">3</span>
