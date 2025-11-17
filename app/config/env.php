@@ -1,4 +1,4 @@
-<?php 
+<?php
 // default config
 $config = [
     // App
@@ -37,31 +37,42 @@ function env($key, $default = null)
     }
     return $default;
 }
-// try to load .env from project root (two levels up from this file)
-$envPath = realpath(__DIR__ . '/../../.env') ?: __DIR__ . '/../../.env';
-
-if (is_readable($envPath)) {
-    $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        $line = trim($line);
-        if ($line === '' || $line[0] === '#' || $line[0] === ';') {
-            continue;
+// if config.php exists, load it to override defaults
+$configFile = __DIR__ . '/config.php';
+if (is_readable($configFile)) {
+    $fileConfig = include $configFile;
+    if (is_array($fileConfig)) {
+        foreach ($fileConfig as $k => $v) {
+            $config[strtolower($k)] = $v;
         }
-        // split on first '='
-        if (!strpos($line, '=')) {
-            continue;
-        }
-        list($rawKey, $rawVal) = explode('=', $line, 2);
-        $key = trim($rawKey);
-        $val = trim($rawVal);
+    }
+} else {
+    // try to load .env from project root (two levels up from this file)
+    $envPath = realpath(__DIR__ . '/../../.env') ?: __DIR__ . '/../../.env';
 
-        // remove surrounding quotes if present
-        if ((strlen($val) >= 2) && (($val[0] === '"' && $val[-1] === '"') || ($val[0] === "'" && $val[-1] === "'"))) {
-            $val = substr($val, 1, -1);
-        }
+    if (is_readable($envPath)) {
+        $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#' || $line[0] === ';') {
+                continue;
+            }
+            // split on first '='
+            if (!strpos($line, '=')) {
+                continue;
+            }
+            list($rawKey, $rawVal) = explode('=', $line, 2);
+            $key = trim($rawKey);
+            $val = trim($rawVal);
 
-        // store in config array with lowercase key
-        $lower = strtolower($key);
-        $config[$lower] = $val;
+            // remove surrounding quotes if present
+            if ((strlen($val) >= 2) && (($val[0] === '"' && $val[-1] === '"') || ($val[0] === "'" && $val[-1] === "'"))) {
+                $val = substr($val, 1, -1);
+            }
+
+            // store in config array with lowercase key
+            $lower = strtolower($key);
+            $config[$lower] = $val;
+        }
     }
 }

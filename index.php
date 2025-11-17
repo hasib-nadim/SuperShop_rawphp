@@ -24,7 +24,7 @@ pageHead("Home - Supershop", ["home.css"]);
             <button>Search</button>
         </div>
         <div class="header-icons">
-            <a class="icon-btn" href="/auth/login/">
+            <a class="icon-btn" href="/auth/login">
                 👤
             </a>
             <button class="icon-btn">
