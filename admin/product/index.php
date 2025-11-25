@@ -87,7 +87,7 @@ $totalPages = $perPage > 0 ? (int)ceil($total / $perPage) : 1;
                             </td>
                             <td style="padding:8px;vertical-align:middle"><a href="<?php echo url('/admin/product/edit.php') . '?id=' . (int)$p['id']; ?>"><?php echo htmlspecialchars($p['title']); ?></a></td>
                             <td style="padding:8px;vertical-align:middle"><?php echo htmlspecialchars($p['sku']); ?></td>
-                            <td style="padding:8px;vertical-align:middle">₹ <?php echo number_format((float)$p['price'], 2); ?></td>
+                            <td style="padding:8px;vertical-align:middle">$ <?php echo number_format((float)$p['price'], 2); ?></td>
                             <td style="padding:8px;vertical-align:middle"><?php echo (int)$p['stock']; ?></td>
                             <td style="padding:8px;vertical-align:middle"><?php echo htmlspecialchars($p['category_name'] ?? '-'); ?></td>
                             <td style="padding:8px;vertical-align:middle"><?php echo $p['is_active'] ? 'Yes' : 'No'; ?></td>

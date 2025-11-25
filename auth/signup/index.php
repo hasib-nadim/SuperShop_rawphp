@@ -1,6 +1,80 @@
 <?php
 require_once __DIR__ . '/../../_imports.php';
 pageHead("Sign Up - Supershop", ["user_register.css"]);
+
+
+// prepare containers
+$inputs = [];
+$errors = null;
+
+if (Req\isPost()) {
+    [$inputs, $errors] = Req\validate([
+        'firstName' => 'required|trim|sanitize',
+        'lastName' => 'trim|sanitize',
+        'email' => 'required|trim|email',
+        'phone' => 'required|trim',
+        'password' => 'required|min:8',
+        'confirmPassword' => 'required|trim',
+        'terms' => 'required'
+    ]);
+
+    if ($errors === null) {
+        $first = $inputs['firstName'] ?? '';
+        $last = $inputs['lastName'] ?? '';
+        $email = $inputs['email'] ?? '';
+        $phone = $inputs['phone'] ?? '';
+        $password = $inputs['password'] ?? '';
+        $confirm = $inputs['confirmPassword'] ?? '';
+
+        if ($password !== $confirm) {
+            $_SESSION['flash_error'] = 'Passwords do not match.';
+        } else {
+            $conn = DB\getConnection();
+            if (DB\exists_by('users', 'email', $email)) {
+                $_SESSION['flash_error'] = 'Email is already registered.';
+            } else {
+                $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                $ins = $conn->prepare("INSERT INTO `users` (`first_name`,`last_name`,`email`,`password_hash`,`phone`,`created_at`) VALUES (?,?,?,?,?,NOW())");
+                if ($ins) {
+                    $ins->bind_param('sssss', $first, $last, $email, $password_hash, $phone);
+                    if ($ins->execute()) {
+                        $userId = $conn->insert_id;
+                        $ins->close();
+
+                        if (!session_id()) { @session_start(); }
+                        session_regenerate_id(true);
+                        $sid = session_id();
+
+                        $payload = json_encode(['user_id' => $userId, 'email' => $email]);
+                        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+                        $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 512);
+                        $lifetime = (int) (function_exists('env') ? env('session_lifetime', 120) : 120);
+                        $expires_at = date('Y-m-d H:i:s', time() + ($lifetime * 60));
+
+                        $insSql = "INSERT INTO `sessions` (`id`,`user_id`,`payload`,`ip_address`,`user_agent`,`last_activity`,`expires_at`) VALUES (?,?,?,?,?,NOW(),?);";
+                        $ins2 = $conn->prepare($insSql);
+                        if ($ins2) {
+                            $ins2->bind_param('sissss', $sid, $userId, $payload, $ip, $ua, $expires_at);
+                            $ins2->execute();
+                            $ins2->close();
+                        }
+
+                        $_SESSION['session_id'] = $sid;
+                        $_SESSION['flash_success'] = 'Account created and logged in.';
+                        redirect('/');
+                        exit();
+                    } else {
+                        $_SESSION['flash_error'] = 'Failed to create account.';
+                        $ins->close();
+                    }
+                } else {
+                    $_SESSION['flash_error'] = 'Server error: failed to prepare statement.';
+                }
+            }
+        }
+    }
+
+}
 ?>
 <div class="container">
     <div class="left-section">

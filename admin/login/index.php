@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__ . '/../../_imports.php';
-
-use Req;
+pageHead("Admin Login - Supershop",["admin_login.css"]);
 
 use function Req\hasError;
 

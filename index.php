@@ -1,96 +1,79 @@
 <?php
 require_once __DIR__ . '/_imports.php';
 pageHead("Home - Supershop", ["home.css"]);
+$user = GetUser();
+component('header.php', ['user' => $user]);
+component('nav.php');
 ?>
 
-<!-- Top Bar -->
-<div class="top-bar">
-    <div class="container">
-        <div>📞 Customer Service: +1-800-123-4567</div>
-        <div>
-            <!-- <?php echo env('APP_ENV'); ?> -->
-            <a href="#">Track Order</a>
-            <a href="#">Help</a>
-        </div>
-    </div>
-</div>
-
-<!-- Header -->
-<header>
-    <div class="header-main">
-        <div class="logo">🛒 SuperShop</div>
-        <div class="search-bar">
-            <input type="text" placeholder="Search for products...">
-            <button>Search</button>
-        </div>
-        <div class="header-icons">
-            <a class="icon-btn" href="/auth/login">
-                👤
-            </a>
-            <button class="icon-btn">
-                ❤️
-                <span class="badge">3</span>
-            </button>
-            <button class="icon-btn">
-                🛒
-                <span class="badge">5</span>
-            </button>
-        </div>
-    </div>
-</header>
-
-<!-- Navigation -->
-<nav>
-    <ul>
-        <li><a href="#">Home</a></li>
-        <li><a href="#">Electronics</a></li>
-        <li><a href="#">Fashion</a></li>
-        <li><a href="#">Home & Living</a></li>
-        <li><a href="#">Beauty</a></li>
-        <li><a href="#">Sports</a></li>
-        <li><a href="#">Deals</a></li>
-    </ul>
-</nav>
 
 <!-- Hero Section -->
 <section class="hero">
     <h1>Welcome to SuperShop</h1>
     <p>Your One-Stop Shopping Destination for Everything You Need</p>
-    <a href="#" class="btn">Shop Now</a>
+    <a href="/product" class="btn">Shop Now</a>
 </section>
 
 <!-- Categories -->
 <section class="categories">
     <h2 class="section-title">Shop by Category</h2>
+    <style>
+        .category-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+        .category-item{display:block;padding:16px;border-radius:10px;border:1px solid #e8eef5;background:#fff;color:inherit;text-decoration:none;transition:transform .12s ease,box-shadow .12s ease}
+        .category-item:hover{transform:translateY(-6px);box-shadow:0 12px 30px rgba(12,18,31,0.06)}
+        .category-item ul{margin:0;padding-left:18px}
+        .category-item li{font-weight:700;font-size:16px;color:#0f172a}
+        .category-item .children{margin-top:8px;color:#6b7280;font-size:13px}
+    </style>
+
+    <?php
+    $conn = DB\getConnection();
+    $parents = [];
+    $cres = $conn->query("SELECT id,name,slug FROM categories WHERE parent_id IS NULL AND is_active = 1 ORDER BY name ASC");
+    if ($cres) {
+        while ($crow = $cres->fetch_assoc()) $parents[] = $crow;
+    }
+    ?>
+
     <div class="category-grid">
-        <div class="category-card">
-            <div class="category-img"></div>
-            <div class="category-info">
-                <h3>Electronics</h3>
-                <p>Latest gadgets & devices</p>
-            </div>
-        </div>
-        <div class="category-card">
-            <div class="category-img" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
-            <div class="category-info">
-                <h3>Fashion</h3>
-                <p>Trendy clothing & accessories</p>
-            </div>
-        </div>
-        <div class="category-card">
-            <div class="category-img" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
-            <div class="category-info">
-                <h3>Home & Living</h3>
-                <p>Furniture & decor</p>
-            </div>
-        </div>
-        <div class="category-card">
-            <div class="category-img" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);"></div>
-            <div class="category-info">
-                <h3>Beauty</h3>
-                <p>Cosmetics & skincare</p>
-            </div>
-        </div>
+        <?php if (empty($parents)): ?>
+            <div style="color:#6b7280">No categories available.</div>
+        <?php endif; ?>
+
+        <?php foreach ($parents as $p): ?>
+            <?php
+            $children = [];
+            try {
+                if (!empty($p['id'])) {
+                    $cstmt = $conn->prepare("SELECT name,slug FROM categories WHERE parent_id = ? AND is_active = 1 ORDER BY name ASC LIMIT 2");
+                    if ($cstmt) {
+                        $cstmt->bind_param('i', $p['id']);
+                        $cstmt->execute();
+                        $cres2 = $cstmt->get_result();
+                        while ($r = $cres2->fetch_assoc()) $children[] = $r;
+                        $cstmt->close();
+                    }
+                }
+            } catch (\Throwable $e) {
+                // ignore
+            }
+            ?>
+
+            <a class="category-item" href="<?php echo url('/product?category=' . rawurlencode($p['slug'])); ?>">
+                <div>
+                    <ul>
+                        <li><?php echo htmlspecialchars($p['name']); ?></li>
+                    </ul>
+                    <div class="children">
+                        <?php if (!empty($children)): ?>
+                            <?php echo htmlspecialchars($children[0]['name']); ?><?php if (count($children) > 1) echo ', ' . htmlspecialchars($children[1]['name']); ?>
+                        <?php else: ?>
+                            Explore products
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </a>
+        <?php endforeach; ?>
     </div>
 </section>
 
@@ -98,39 +81,64 @@ pageHead("Home - Supershop", ["home.css"]);
 <section class="products">
     <div class="products-container">
         <h2 class="section-title">Featured Products</h2>
+        <?php
+        // fetch featured products
+        $featured = [];
+        try {
+            $fstmt = $conn->prepare("SELECT p.id,p.title,p.slug,p.price,p.images,p.stock,p.created_at, c.name as category_name FROM products p LEFT JOIN categories c ON c.id = p.primary_category_id WHERE p.is_featured = 1 AND p.is_active = 1 ORDER BY p.created_at DESC LIMIT 8");
+            if ($fstmt) {
+                $fstmt->execute();
+                $fres = $fstmt->get_result();
+                while ($prow = $fres->fetch_assoc()) {
+                    // normalize images
+                    $imgs = [];
+                    if (!empty($prow['images'])) {
+                        $raw = $prow['images'];
+                        $decoded = json_decode($raw, true);
+                        if (is_array($decoded)) $imgs = $decoded;
+                        else $imgs = array_filter(array_map('trim', explode(',', $raw)));
+                    }
+                    $prow['images_arr'] = $imgs;
+                    $featured[] = $prow;
+                }
+                $fstmt->close();
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+        ?>
+
         <div class="product-grid">
-            <div class="product-card">
-                <div class="product-img"></div>
-                <div class="product-info">
-                    <h3>Wireless Headphones</h3>
-                    <div class="price">$89.99 <span class="old-price">$129.99</span></div>
-                    <button class="add-to-cart">Add to Cart</button>
+            <style>
+                .product-info .btn{padding:8px 12px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+                .product-info .add-to-cart{background:#0b8457;color:#fff}
+                .product-info .add-to-cart.loading{opacity:.7}
+                .product-info .btn-outline{background:transparent;border:1px solid #e6edf3;color:#0f172a}
+                .product-info .btn:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(12,18,31,0.05)}
+                .product-info .btn:active{transform:translateY(0)}
+            </style>
+            <?php if (empty($featured)): ?>
+                <div class="muted">No featured products right now.</div>
+            <?php endif; ?>
+
+            <?php foreach ($featured as $p): ?>
+                <?php $img = $p['images_arr'][0] ?? '/public/images/products/placeholder.png'; ?>
+                <div class="product-card" data-url="<?php echo url('/product?slug=' . htmlspecialchars($p['slug'])); ?>" style="cursor:pointer">
+                    <div class="product-img" style="background:#f7fafc;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:10px;height:160px">
+                        <a href="<?php echo url('/product?slug=' . htmlspecialchars($p['slug'])); ?>" style="display:block;width:100%;height:100%">
+                            <img src="<?php echo htmlspecialchars($img); ?>" alt="<?php echo htmlspecialchars($p['title']); ?>" style="width:100%;height:100%;object-fit:cover;display:block">
+                        </a>
+                    </div>
+                    <div class="product-info" style="padding-top:8px">
+                        <h3><a href="<?php echo url('/product?slug=' . htmlspecialchars($p['slug'])); ?>" style="color:inherit;text-decoration:none"><?php echo htmlspecialchars($p['title']); ?></a></h3>
+                        <div class="price">৳ <?php echo number_format((float)$p['price'], 2); ?></div>
+                        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+                            <button type="button" class="btn add-to-cart" data-endpoint="<?php echo url('/product/add_cart.php'); ?>" data-product-id="<?php echo (int)$p['id']; ?>">Add</button>
+                            <a class="btn btn-outline" href="<?php echo url('/product?slug=' . htmlspecialchars($p['slug'])); ?>">View</a>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="product-card">
-                <div class="product-img" style="background: linear-gradient(135deg, #ff9a56 0%, #ff6a88 100%);"></div>
-                <div class="product-info">
-                    <h3>Smart Watch Pro</h3>
-                    <div class="price">$199.99 <span class="old-price">$249.99</span></div>
-                    <button class="add-to-cart">Add to Cart</button>
-                </div>
-            </div>
-            <div class="product-card">
-                <div class="product-img" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
-                <div class="product-info">
-                    <h3>Designer Handbag</h3>
-                    <div class="price">$149.99 <span class="old-price">$199.99</span></div>
-                    <button class="add-to-cart">Add to Cart</button>
-                </div>
-            </div>
-            <div class="product-card">
-                <div class="product-img" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
-                <div class="product-info">
-                    <h3>Running Shoes</h3>
-                    <div class="price">$79.99 <span class="old-price">$99.99</span></div>
-                    <button class="add-to-cart">Add to Cart</button>
-                </div>
-            </div>
+            <?php endforeach; ?>
         </div>
     </div>
 </section>
@@ -172,50 +180,44 @@ pageHead("Home - Supershop", ["home.css"]);
 </footer>
 
 <script>
-    // Add to cart functionality
-    const addToCartBtns = document.querySelectorAll('.add-to-cart');
-    const cartBadge = document.querySelector('.icon-btn:last-child .badge');
+// Wire add-to-cart buttons to the centralized `window.addToCart` function (defined in /public/js/cart.js)
+(function(){
+    function safeAdd(btn){
+        btn.addEventListener('click', function(e){
+            var pid = btn.getAttribute('data-product-id');
+            var endpoint = btn.getAttribute('data-endpoint') || '/product/add_cart.php';
+            if (typeof window.addToCart === 'function') {
+                window.addToCart(pid, 1, {endpoint: endpoint, btn: btn}).catch(function(){});
+            } else {
+                // fallback: perform a simple POST
+                btn.disabled = true;
+                fetch(endpoint, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest'}, body: new URLSearchParams({product_id: pid, qty:1})})
+                    .then(function(r){ return r.text(); }).then(function(){ btn.disabled = false; location.reload(); }).catch(function(){ btn.disabled = false; alert('Network error'); });
+            }
+        });
+    }
 
-    addToCartBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            let currentCount = parseInt(cartBadge.textContent);
-            cartBadge.textContent = currentCount + 1;
+    document.querySelectorAll('.add-to-cart').forEach(safeAdd);
 
-            // Visual feedback
-            this.textContent = 'Added!';
-            this.style.background = '#27ae60';
-
-            setTimeout(() => {
-                this.textContent = 'Add to Cart';
-                this.style.background = '#e74c3c';
-            }, 1000);
+    // Category card interactions (keep existing behavior if present)
+    document.querySelectorAll('.category-card').forEach(function(card){
+        card.addEventListener('click', function(){
+            var h = card.querySelector('h3'); if (!h) return; alert('Browsing ' + h.textContent);
         });
     });
 
-    // Search functionality
-    const searchInput = document.querySelector('.search-bar input');
-    const searchBtn = document.querySelector('.search-bar button');
-
-    searchBtn.addEventListener('click', function() {
-        if (searchInput.value.trim()) {
-            alert('Searching for: ' + searchInput.value);
-        }
-    });
-
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter' && this.value.trim()) {
-            alert('Searching for: ' + this.value);
-        }
-    });
-
-    // Category card interactions
-    const categoryCards = document.querySelectorAll('.category-card');
-    categoryCards.forEach(card => {
-        card.addEventListener('click', function() {
-            const categoryName = this.querySelector('h3').textContent;
-            alert('Browsing ' + categoryName + ' category');
+    // Make product-card clickable except when clicking buttons/links inside
+    document.querySelectorAll('.product-card').forEach(function(card){
+        card.addEventListener('click', function(e){
+            // do nothing if clicked element is a link or inside a link
+            if (e.target.closest('a')) return;
+            // do nothing if clicking the add button or a control
+            if (e.target.closest('.add-to-cart') || e.target.closest('button') || e.target.closest('form')) return;
+            var url = card.getAttribute('data-url');
+            if (url) window.location.href = url;
         });
     });
+})();
 </script>
 <?php
 pageFooter();

@@ -11,8 +11,7 @@ require_once __DIR__ . '/app/helpers/Session.php';
 require_once __DIR__ . '/app/database/db.php';
 
 function pageHead($pageTitle="Bigshop", $stylesheets=[]) {
-    require_once __DIR__ . '/partials/head.php';
-    require_once __DIR__ . '/partials/header.php';
+    require_once __DIR__ . '/partials/head.php'; 
 }
 
 function pageFooter() {
@@ -29,8 +28,7 @@ function component($pathName, $vars=[]){
 }
 
 function redirect($url) {
-    header("Location: $url");
-    exit();
+    header("Location: $url"); 
 }
 
 function imageUrl($relativePath): string {

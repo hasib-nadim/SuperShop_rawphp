@@ -81,11 +81,13 @@ CREATE TABLE IF NOT EXISTS `products` (
   `title` VARCHAR(191) NOT NULL,
   `slug` VARCHAR(191) NOT NULL,
   `description` LONGTEXT NULL,
+  `long_description` LONGTEXT NULL,
   `price` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
   `stock` INT NOT NULL DEFAULT 0,
   -- images: stored as JSON string or comma-separated list; using LONGTEXT for broad compatibility
   `images` LONGTEXT NULL,
   `primary_category_id` INT UNSIGNED NULL,
+  `is_featured` TINYINT(1) NOT NULL DEFAULT 0,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -152,3 +154,74 @@ SET @sql5 = IF(@fk_cnt5 = 0,
     'ALTER TABLE `order_items` ADD CONSTRAINT `fk_order_items_order` FOREIGN KEY (`order_id`) REFERENCES `orders`(`id`) ON DELETE CASCADE ON UPDATE CASCADE',
     'SELECT 1');  
 PREPARE stmt5 FROM @sql5; EXECUTE stmt5; DEALLOCATE PREPARE stmt5;
+
+-- Ensure orders table has shipping columns (idempotent)
+SET @col_cnt_ship_first := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'shipping_first_name');
+SET @sql_ship_first = IF(@col_cnt_ship_first = 0,
+  'ALTER TABLE `orders` ADD COLUMN `shipping_first_name` VARCHAR(191) NULL AFTER `status`',
+  'SELECT 1');
+PREPARE stmt_ship_first FROM @sql_ship_first; EXECUTE stmt_ship_first; DEALLOCATE PREPARE stmt_ship_first;
+
+SET @col_cnt_ship_last := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'shipping_last_name');
+SET @sql_ship_last = IF(@col_cnt_ship_last = 0,
+  'ALTER TABLE `orders` ADD COLUMN `shipping_last_name` VARCHAR(191) NULL AFTER `shipping_first_name`',
+  'SELECT 1');
+PREPARE stmt_ship_last FROM @sql_ship_last; EXECUTE stmt_ship_last; DEALLOCATE PREPARE stmt_ship_last;
+
+SET @col_cnt_ship_phone := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'shipping_phone');
+SET @sql_ship_phone = IF(@col_cnt_ship_phone = 0,
+  'ALTER TABLE `orders` ADD COLUMN `shipping_phone` VARCHAR(50) NULL AFTER `shipping_last_name`',
+  'SELECT 1');
+PREPARE stmt_ship_phone FROM @sql_ship_phone; EXECUTE stmt_ship_phone; DEALLOCATE PREPARE stmt_ship_phone;
+
+SET @col_cnt_ship_addr := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'shipping_address');
+SET @sql_ship_addr = IF(@col_cnt_ship_addr = 0,
+  'ALTER TABLE `orders` ADD COLUMN `shipping_address` LONGTEXT NULL AFTER `shipping_phone`',
+  'SELECT 1');
+PREPARE stmt_ship_addr FROM @sql_ship_addr; EXECUTE stmt_ship_addr; DEALLOCATE PREPARE stmt_ship_addr;
+
+-- Ensure new product columns exist (idempotent): `is_featured`, `long_description`
+SET @col_cnt_is_featured := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'is_featured');
+SET @sql_is_featured = IF(@col_cnt_is_featured = 0,
+  'ALTER TABLE `products` ADD COLUMN `is_featured` TINYINT(1) NOT NULL DEFAULT 0 AFTER `primary_category_id`',
+  'SELECT 1');
+PREPARE stmt_is_featured FROM @sql_is_featured; EXECUTE stmt_is_featured; DEALLOCATE PREPARE stmt_is_featured;
+
+SET @col_cnt_long_desc := (SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'long_description');
+SET @sql_long_desc = IF(@col_cnt_long_desc = 0,
+  'ALTER TABLE `products` ADD COLUMN `long_description` LONGTEXT NULL AFTER `description`',
+  'SELECT 1');
+PREPARE stmt_long_desc FROM @sql_long_desc; EXECUTE stmt_long_desc; DEALLOCATE PREPARE stmt_long_desc;
+
+-- --------------------------------------------------
+-- 3) Carts table (stores per-user or per-session cart rows)
+-- --------------------------------------------------
+CREATE TABLE IF NOT EXISTS `carts` (
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT UNSIGNED NULL,
+  `session_id` VARCHAR(128) NULL,
+  `product_id` INT UNSIGNED NOT NULL,
+  `quantity` INT NOT NULL DEFAULT 1,
+  `unit_price` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_carts_user` (`user_id`),
+  KEY `idx_carts_session` (`session_id`),
+  KEY `idx_carts_product` (`product_id`),
+  UNIQUE KEY `ux_carts_user_product` (`user_id`,`product_id`),
+  UNIQUE KEY `ux_carts_session_product` (`session_id`,`product_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add FK: carts.user_id -> users.id (idempotent)
+SET @fk_cnt_carts_user := (SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS
+                 WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'carts' AND CONSTRAINT_NAME = 'fk_carts_user');
+SET @sql_carts_user = IF(@fk_cnt_carts_user = 0,
+  'ALTER TABLE `carts` ADD CONSTRAINT `fk_carts_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE ON UPDATE CASCADE',
+  'SELECT 1');
+PREPARE stmt_carts_user FROM @sql_carts_user; EXECUTE stmt_carts_user; DEALLOCATE PREPARE stmt_carts_user;

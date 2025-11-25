@@ -79,7 +79,7 @@ function GetAdmin()
         if ($ast->fetch()) {
             $admin = [
                 'id' => $aid,
-                'username' => $ausername, 
+                'username' => $ausername,
                 'email' => $aemail,
                 'role' => $arole,
                 'is_super' => (int)$ais_super,
@@ -138,4 +138,94 @@ function LogoutAdmin()
     session_destroy();
     header('Location: /admin/login');
     exit();
+}
+
+function GetUser($required = false)
+{
+    // prefer session_id stored in session (set at login), else use PHP session id
+    $sid = $_SESSION['session_id'];
+
+    if (empty($sid) && $required) {
+        $_SESSION['flash_error'] = 'You must be logged.';
+        redirect("/auth/login");
+        exit();
+    }
+    if (!empty($sid)) {
+        $conn = \DB\getConnection();
+        $sql = "SELECT `user_id`, `expires_at` FROM `sessions` WHERE `id` = ? LIMIT 1";
+        $stmt = $conn->prepare($sql);
+        if (!$stmt && $required) {
+            // fallback
+            $_SESSION['flash_error'] = 'Failed to find User session.';
+            redirect("/auth/login");
+            exit();
+        }
+
+        $stmt->bind_param('s', $sid);
+        $stmt->execute();
+        $userId = null;
+        $expiresAt = null;
+        $stmt->bind_result($userId, $expiresAt);
+        $found = $stmt->fetch();
+        $stmt->close();
+
+        if (!$found && $required) {
+            // no server-side session -> redirect
+            $_SESSION['flash_error'] = 'Failed to find User session.';
+            redirect("/auth/login");
+        }
+
+
+        // check expiry if set
+        if (!is_null($expiresAt) && $expiresAt !== '') {
+            $now = date('Y-m-d H:i:s');
+            if ($expiresAt < $now) {
+                // expired: remove session row and redirect
+                $del = $conn->prepare("DELETE FROM `sessions` WHERE `id` = ? LIMIT 1");
+                if ($del) {
+                    $del->bind_param('s', $sid);
+                    $del->execute();
+                    $del->close();
+                }
+
+                $_SESSION['flash_error'] = 'User session expried.';
+                redirect("/auth/login");
+            }
+        }
+        // refresh last_activity
+        $upd = $conn->prepare("UPDATE `sessions` SET `last_activity` = NOW() WHERE `id` = ? LIMIT 1");
+        if ($upd) {
+            $upd->bind_param('s', $sid);
+            $upd->execute();
+            $upd->close();
+        }
+
+        // fetch full user entity (users table stores first_name/last_name)
+        $user = null;
+        $uSql = "SELECT `id`,`first_name`,`last_name`,`email`,`created_at` FROM `users` WHERE `id` = ? LIMIT 1";
+        $ust = $conn->prepare($uSql);
+        if ($ust) {
+            $ust->bind_param('i', $userId);
+            $ust->execute();
+            $uid = $ufirst = $ulast = $uemail = $ucreated_at = null;
+            $ust->bind_result($uid, $ufirst, $ulast, $uemail, $ucreated_at);
+            if ($ust->fetch()) {
+                $display = trim(($ufirst ?? '') . ' ' . ($ulast ?? '')) ?: $uemail;
+                $user = [
+                    'id' => $uid,
+                    'username' => $display,
+                    'email' => $uemail,
+                    'created_at' => $ucreated_at,
+                ];
+            }
+            $ust->close();
+        }
+        if ($user) {
+            return $user;
+        } elseif ($required) {
+            $_SESSION['flash_error'] = 'Failed to load User details.';
+            redirect("/auth/login");
+        }
+    }
+    return null;
 }

@@ -49,6 +49,7 @@ if ($res) { $r = $res->fetch_assoc(); $superadmins = (int)($r['cnt'] ?? 0); }
 
 	<div class="admin-entity-header">
 		<h1>Dashboard</h1>
+		<a href="/" target="_blank" rel="noopener noreferrer">View Site</a>
 	</div>
 
 	<div class="stats-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:18px">
@@ -111,7 +112,7 @@ if ($res) { $r = $res->fetch_assoc(); $superadmins = (int)($r['cnt'] ?? 0); }
 						<td style="padding:8px"><?php echo (int)$p['id']; ?></td>
 						<td style="padding:8px"><?php echo htmlspecialchars($p['title']); ?></td>
 						<td style="padding:8px"><?php echo htmlspecialchars($p['sku']); ?></td>
-						<td style="padding:8px">₹ <?php echo number_format((float)$p['price'],2); ?></td>
+						<td style="padding:8px">$ <?php echo number_format((float)$p['price'],2); ?></td>
 						<td style="padding:8px"><?php echo (int)$p['stock']; ?></td>
 						<td style="padding:8px"><?php echo $p['is_active'] ? 'Yes' : 'No'; ?></td>
 						<td style="padding:8px"><?php echo htmlspecialchars($p['created_at']); ?></td>

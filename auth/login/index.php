@@ -1,6 +1,66 @@
 <?php
 require_once __DIR__ . '/../../_imports.php';
 pageHead("Login - Supershop", ["user_signin.css"]);
+
+// prepare containers
+$inputs = [];
+$errors = null;
+
+if (Req\isPost()) {
+    [$inputs, $errors] = Req\validate([
+        'email' => 'required|trim|email',
+        'password' => 'required',
+    ]);
+
+    if ($errors === null) {
+        $email = $inputs['email'] ?? '';
+        $password = $inputs['password'] ?? '';
+        $conn = DB\getConnection();
+        $sql = "SELECT `id`, `password_hash`, `first_name`, `last_name` FROM `users` WHERE `email` = ? LIMIT 1";
+        $stmt = $conn->prepare($sql);
+        if ($stmt) {
+            $stmt->bind_param('s', $email);
+            $stmt->execute();
+            $stmt->bind_result($userId, $password_hash, $first_name, $last_name);
+            if ($stmt->fetch()) {
+                $stmt->close();
+                if (password_verify($password, $password_hash ?? "")) {
+                    if (!session_id()) { @session_start(); }
+                    session_regenerate_id(true);
+                    $sid = session_id();
+
+                    $display = trim(($first_name ?? '') . ' ' . ($last_name ?? '')) ?: $email;
+                    $payload = json_encode(['user_id' => $userId, 'email' => $email, 'name' => $display]);
+                    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+                    $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 512);
+                    $lifetime = (int) (function_exists('env') ? env('session_lifetime', 120) : 120);
+                    $expires_at = date('Y-m-d H:i:s', time() + ($lifetime * 60));
+
+                    $insSql = "INSERT INTO `sessions` (`id`,`user_id`,`payload`,`ip_address`,`user_agent`,`last_activity`,`expires_at`) VALUES (?,?,?,?,?,NOW(),?);";
+                    $ins = $conn->prepare($insSql);
+                    if ($ins) {
+                        $ins->bind_param('sissss', $sid, $userId, $payload, $ip, $ua, $expires_at);
+                        $ins->execute();
+                        $ins->close();
+                    }
+
+                    $_SESSION['session_id'] = $sid;
+                    $_SESSION['flash_success'] = 'Login successful.';
+                    redirect('/');
+                    exit();
+                } else {
+                    $_SESSION['flash_error'] = 'Invalid email or password.';
+                }
+            } else {
+                $stmt->close();
+                $_SESSION['flash_error'] = 'Invalid email or password.';
+            }
+        } else {
+            $_SESSION['flash_error'] = 'Server error: could not prepare statement.';
+        }
+    }
+
+}
 ?>
 <div class="container">
     <div class="left-section">

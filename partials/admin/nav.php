@@ -5,7 +5,7 @@
 		<a class="brand" href="<?php echo url("/admin"); ?>">🛒 Super shop</a>
 
 		<ul class="nav-links">
-			<li><a href="/admin/">Dashboard</a></li>
+			<li><a href="/admin">Dashboard</a></li>
 			<li><a href="/admin/product">Products</a></li>
 			<li><a href="/admin/category">Categories</a></li>
 			<li><a href="/admin/orders">Orders</a></li>
