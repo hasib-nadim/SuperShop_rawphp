@@ -30,8 +30,7 @@ if (Req\isPost()) {
             if ($stmt->fetch()) {
                 // got a row
                 $stmt->close();
-                if (password_verify($password, $password_hash??"")) {
-                    print_r([$password, $password_hash,$username, $adminId]);
+                if (password_verify($password, $password_hash??"")) { 
                     // authentication success
                     // create a session and insert in table and set in request session
                     // regenerate PHP session id for this login
